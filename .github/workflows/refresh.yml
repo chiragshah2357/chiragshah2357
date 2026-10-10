@@ -1,0 +1,36 @@
+name: Refresh activity graphics
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # daily, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Rebuild graphics from the public GitHub API
+        run: python scripts/build.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Fold any change into the single commit
+        # The repository keeps exactly one commit, so a refresh amends it instead of adding a daily one.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets data README.md
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit --amend --no-edit
+            git push --force-with-lease
+          fi
